@@ -19,30 +19,28 @@
         default = self.packages.${pkgs.stdenv.hostPlatform.system}.mini-agenix;
       });
 
-      nixosModules = {
-        mini-agenix =
-          {
-            config,
-            lib,
-            pkgs,
-            ...
-          }:
-
-          let
-            cfg = config.mini-agenix;
-          in
-          {
-            options.mini-agenix = {
-              enable = lib.mkEnableOption "mini-agenix evaluation-time secret decryption plugin";
-              package = lib.mkPackageOption self.packages.${pkgs.stdenv.hostPlatform.system} "mini-agenix" { };
-            };
-
-            config = lib.mkIf cfg.enable {
-              nix.settings.plugin-files = [ "${cfg.package}/lib/libmini_agenix.so" ];
-            };
-          };
-        default = self.nixosModules.mini-agenix;
-      };
+      # Helper to generate the NIX_CONFIG value that loads the plugin.
+      # Use in a devShell:
+      #
+      #   pkgs.mkShell {
+      #     NIX_CONFIG = inputs'.mini-agenix.lib.nixConfig;
+      #   }
+      #
+      # The plugin MUST be loaded from a devShell (or equivalent) so that
+      # the nix binary and the plugin are always built from the same nixpkgs.
+      # Do NOT use nix.settings.plugin-files in NixOS configurations — it
+      # forces every nix invocation on the system to load the plugin,
+      # including nix-env during boot loader installation, which breaks
+      # whenever the nix version and plugin version diverge across generations.
+      lib = forAllSystems (
+        pkgs:
+        let
+          plugin = self.packages.${pkgs.stdenv.hostPlatform.system}.mini-agenix;
+        in
+        {
+          nixConfig = "plugin-files = ${plugin}/lib/libmini_agenix.so";
+        }
+      );
 
       checks = forAllSystems (pkgs: {
         build = self.packages.${pkgs.stdenv.hostPlatform.system}.mini-agenix;
