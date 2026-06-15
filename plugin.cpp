@@ -148,7 +148,7 @@ static StorePath resolveAge(
                    " You may need to run an initial impure evaluation on a machine with the identity,"
                    " or populate the store path via substitution.";
 
-        state.error<EvalError>("%s", msg).atPos(pos).debugThrow();
+        state.error<ThrownError>("%s", msg).atPos(pos).debugThrow();
     }
 
     auto encryptedPath = std::filesystem::path(encryptedFile.path.abs());
