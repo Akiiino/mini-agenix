@@ -19,8 +19,8 @@
 using namespace nix;
 
 struct IdentityDiscovery {
-    std::vector<Path> candidates;
-    std::vector<Path> usable;
+    std::vector<std::filesystem::path> candidates;
+    std::vector<std::filesystem::path> usable;
 };
 
 static IdentityDiscovery discoverIdentities()
@@ -46,14 +46,14 @@ static IdentityDiscovery discoverIdentities()
     return result;
 }
 
-static std::string decryptWithAge(const Path & encryptedPath, const std::vector<Path> & identities)
+static std::string decryptWithAge(const std::filesystem::path & encryptedPath, const std::vector<std::filesystem::path> & identities)
 {
     Strings args = {"--decrypt"};
     for (auto & id : identities) {
         args.push_back("-i");
-        args.push_back(id);
+        args.push_back(id.string());
     }
-    args.push_back(encryptedPath);
+    args.push_back(encryptedPath.string());
     return runProgram(AGE_PATH, false, args);
 }
 
@@ -64,16 +64,16 @@ static std::string stripAgeSuffix(std::string_view name)
     return std::string(name);
 }
 
-static std::string describeCandidate(const Path & p)
+static std::string describeCandidate(const std::filesystem::path & p)
 {
     try {
         if (!std::filesystem::exists(p))
-            return p + " (not found)";
+            return p.string() + " (not found)";
         if (!pathAccessible(p))
-            return p + " (not readable)";
-        return p + " (found)";
+            return p.string() + " (not readable)";
+        return p.string() + " (found)";
     } catch (...) {
-        return p + " (inaccessible)";
+        return p.string() + " (inaccessible)";
     }
 }
 
@@ -151,7 +151,7 @@ static StorePath resolveAge(
         state.error<EvalError>("%s", msg).atPos(pos).debugThrow();
     }
 
-    auto encryptedPath = encryptedFile.path.abs();
+    auto encryptedPath = std::filesystem::path(encryptedFile.path.abs());
 
     if (!std::filesystem::exists(encryptedPath))
         state
@@ -277,8 +277,7 @@ static void prim_readAge(EvalState & state, const PosIdx pos, Value ** args, Val
                 "builtins.readAge: the decrypted contents of '%s' cannot be represented as a Nix string", file)
             .atPos(pos)
             .debugThrow();
-    v.mkString(content); // nix 2.31
-    // v.mkString(content, state.mem); // this works in master
+    v.mkString(content, state.mem);
 }
 
 static RegisterPrimOp primop_importAge({
@@ -296,7 +295,7 @@ static RegisterPrimOp primop_importAge({
       the result is returned from cache with no decryption or identity needed,
       enabling pure evaluation. Without `hash`, impure mode is required.
     )",
-    .fun = prim_importAge,
+    .impl = prim_importAge,
 });
 
 static RegisterPrimOp primop_readAge({
@@ -314,5 +313,5 @@ static RegisterPrimOp primop_readAge({
       the result is returned from cache with no decryption or identity needed,
       enabling pure evaluation. Without `hash`, impure mode is required.
     )",
-    .fun = prim_readAge,
+    .impl = prim_readAge,
 });
